@@ -1,0 +1,183 @@
+-- File pastebin: rGWAD7V0
+
+function escanearCofre(indice)¡
+    local nombre_archivo = "items_cofre_" .. indice .. ".txt"
+
+    local historial_set = {}
+    if fs.exists(nombre_archivo) then
+        local file = fs.open(nombre_archivo, "r")
+        local line = file.readLine()
+        while line do
+            historial_set[line] = true
+            line = file.readLine()
+        end
+        file.close()
+    end
+
+    local cofre = peripheral.wrap("top")
+    if not cofre then return end
+
+    local items = cofre.list()
+
+    for slot, item in pairs(items) do
+        local detalle = cofre.getItemDetail(slot)
+        if detalle then
+            historial_set[detalle.name] = true
+        end
+    end
+
+    local file = fs.open(nombre_archivo, "w")
+    for item, _ in pairs(historial_set) do
+        file.writeLine(item)
+    end
+    file.close()
+end
+
+function moverItemsAlCofre(indice)
+    local nombre_archivo = "items_cofre_" .. indice .. ".txt"
+
+    if not fs.exists(nombre_archivo) then return end
+
+    local historial_set = {}
+    local file = fs.open(nombre_archivo, "r")
+    local line = file.readLine()
+    while line do
+        historial_set[line] = true
+        line = file.readLine()
+    end
+    file.close()
+
+    local cofre = peripheral.wrap("top")
+    if not cofre then return end
+
+    for slot = 1, 16 do
+        local item = turtle.getItemDetail(slot)
+        if item then
+            if historial_set[item.name] then
+                turtle.select(slot)
+                turtle.dropUp()
+            end
+        end
+    end
+end
+
+function obtenerBloqueDebajo()
+    local success, data = turtle.inspectDown()
+    if success then
+        return data.name
+    else
+        return nil
+    end
+end
+
+function recolectarTodo()
+    local itemsRecolectados = 0
+    while turtle.suckUp() do
+        itemsRecolectados = itemsRecolectados + 1
+    end
+    return itemsRecolectados ~= 0
+end
+
+function vaciarATurtle()
+    local itemsTransferidos = 0
+    for slot = 1, 16 do
+        turtle.select(slot)
+        local item = turtle.getItemDetail()
+        if item then
+            while turtle.dropUp() do
+            end
+        end
+    end
+    turtle.select(1)
+    return itemsTransferidos
+end
+
+function reposta()
+    turtle.turnRight()
+    turtle.suck()
+	while turtle.getFuelLevel() < 150 do
+		if not turtle.refuel(1) then
+			break
+		end
+	end
+    refuelled = turtle.getFuelLevel() >= 150
+    turtle.drop()
+    turtle.turnLeft()
+    return refuelled
+end
+
+function ordena(bloques)
+    vueltas = 0
+    while true do
+        if turtle.getFuelLevel() < 150 then
+            refuelled = reposta()
+            if not refuelled then
+                term.setCursorPos(1, 1)
+                print("No hay gasofa")
+                break
+            end
+        end
+        recoleccion = recolectarTodo()
+        if recoleccion then
+            print("Items recogidos")
+        else
+            print("Nada que recoger")
+            if vueltas >= 1 then
+                return
+            else
+                vueltas = vueltas + 1
+            end
+        end
+        print("next")
+        turtle.down()
+        turtle.forward()
+        index = 1
+        while true do
+            local bloque = obtenerBloqueDebajo()
+            if bloque == bloques[1] then
+                turtle.forward()
+            elseif bloque == bloques[2] then
+                turtle.turnLeft()
+                turtle.forward()
+            elseif bloque == bloques[3] then
+                turtle.turnRight()
+                turtle.forward()
+            elseif bloque == bloques[4] then
+                turtle.up()
+                escanearCofre(index)
+                moverItemsAlCofre(index)
+                turtle.down()
+                turtle.forward()
+                index = index + 1
+            elseif bloque == bloques[5] then
+                turtle.up()
+                vaciarATurtle()
+                turtle.down()
+                turtle.forward()
+            elseif bloque == bloques[6] then
+                turtle.up()
+				break
+            else
+                print("Desconocido " .. bloque)
+                return false
+            end
+        end
+    end
+end
+
+archivo = "bloques.txt"   
+function cargarLista() 
+    local file = fs.open(archivo, "r")
+    local bloques = {}
+    local linea = file.readLine()
+    while linea do
+        table.insert(bloques, linea)
+        linea = file.readLine()
+    end
+    file.close()
+    return bloques
+end
+
+local bloques = cargarLista()
+ordena(bloques)
+shell.run("startup")
